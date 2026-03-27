@@ -7,12 +7,11 @@
     "start": "node server.js"
   },
   "engines": {
-  "node": "20.x"
-},
+    "node": "20.x"
+  },
   "dependencies": {
     "csv-parse": "^5.5.6",
     "express": "^4.21.2",
     "iconv-lite": "^0.6.3"
   }
-  
 }
