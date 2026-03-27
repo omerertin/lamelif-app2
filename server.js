@@ -16,6 +16,19 @@ function normalize(value) {
     .replace(/\s+/g, '');
 }
 
+function getField(row, names) {
+  for (const name of names) {
+    if (
+      row[name] !== undefined &&
+      row[name] !== null &&
+      String(row[name]).trim() !== ''
+    ) {
+      return row[name];
+    }
+  }
+  return '';
+}
+
 function parseCsvFile(filePath) {
   const rawBuffer = fs.readFileSync(filePath);
 
@@ -38,21 +51,25 @@ function parseCsvFile(filePath) {
           bom: true
         });
 
-        if (records.length > 0) return records;
-      } catch (err) {}
+        if (records.length > 0) {
+          return records;
+        }
+      } catch (err) {
+        // başka encoding/delimiter dene
+      }
     }
   }
 
   throw new Error('products.csv okunamadı.');
 }
 
-function getField(row, names) {
-  for (const name of names) {
-    if (row[name] !== undefined && row[name] !== null && String(row[name]).trim() !== '') {
-      return row[name];
-    }
-  }
-  return '';
+function extractTotalStock(stockField) {
+  const matches = String(stockField || '').match(/\[(\d+(?:[.,]\d+)?)\]/g) || [];
+
+  return matches
+    .map((item) => Number(item.replace(/[\[\]]/g, '').replace(',', '.')))
+    .filter((num) => Number.isFinite(num))
+    .reduce((sum, num) => sum + num, 0);
 }
 
 function loadCatalog() {
@@ -64,20 +81,20 @@ function loadCatalog() {
   const productMap = new Map();
 
   for (const row of rows) {
-    const rawCode = getField(row, ['Ürün Kodu', 'Urun Kodu']);
-    const productCode = normalize(rawCode);
+    const rawProductCode = getField(row, ['Ürün Kodu', 'Urun Kodu']);
+    const productCode = normalize(rawProductCode);
+
     if (!productCode) continue;
 
     const productName = getField(row, ['Ürün Adı', 'Urun Adı', 'Urun Adi']);
-    const category = getField(row, ['Kategori Adı', 'Kategori ID', 'Kategori']);
+    const category = getField(row, ['Kategori Adı', 'Kategori', 'Kategori ID']);
     const stockField = getField(row, ['Variant - Stok', 'Stok Adedi']);
-
-    const colorKeyRaw = getField(row, ['Renk ID/ERP Kod', 'Renk ID', 'ERP Kod']);
-    const colorKey = normalize(colorKeyRaw);
+    const rawColorKey = getField(row, ['Renk ID/ERP Kod', 'Renk ID', 'ERP Kod']);
+    const colorKey = normalize(rawColorKey);
 
     if (!productMap.has(productCode)) {
       productMap.set(productCode, {
-        productCode: String(rawCode).trim(),
+        productCode: String(rawProductCode).trim(),
         productName: String(productName || '').trim(),
         category: String(category || '').trim(),
         totalVariants: 0,
@@ -92,13 +109,7 @@ function loadCatalog() {
       current.colorKeys.add(colorKey);
     }
 
-    const stockMatches = String(stockField || '').match(/\[(\d+(?:[.,]\d+)?)\]/g) || [];
-    const stockTotal = stockMatches
-      .map((x) => Number(x.replace(/[\[\]]/g, '').replace(',', '.')))
-      .filter((x) => Number.isFinite(x))
-      .reduce((sum, x) => sum + x, 0);
-
-    current.totalStock += stockTotal;
+    current.totalStock += extractTotalStock(stockField);
   }
 
   for (const product of productMap.values()) {
@@ -112,14 +123,32 @@ function loadCatalog() {
 let catalog = loadCatalog();
 
 app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.json());
 
 app.get('/api/health', (_req, res) => {
   res.json({
     ok: true,
-    dataFile: 'products.csv',
+    dataFile: 'data/products.csv',
     totalProductCodes: catalog.size,
     bt4616: catalog.get('BT4616') || null
   });
+});
+
+app.get('/api/reload', (_req, res) => {
+  try {
+    catalog = loadCatalog();
+    return res.json({
+      ok: true,
+      message: 'Katalog yeniden yüklendi.',
+      totalProductCodes: catalog.size,
+      bt4616: catalog.get('BT4616') || null
+    });
+  } catch (error) {
+    return res.status(500).json({
+      ok: false,
+      message: error.message
+    });
+  }
 });
 
 app.get('/api/check', (req, res) => {
