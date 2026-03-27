@@ -1,18 +1,17 @@
 {
-  "name": "lamelif-rpt-checker",
+  "name": "lamelif-rpt-app",
   "version": "1.0.0",
-  "description": "Lamelif ürün kataloğunda ürün model koduna göre RPT kontrol uygulaması",
+  "description": "Lamelif ürün kodu kontrol uygulaması",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
   },
   "engines": {
-    "node": ">=20"
+    "node": "20.x"
   },
   "dependencies": {
     "csv-parse": "^5.5.6",
     "express": "^4.21.2",
-    "iconv-lite": "^0.6.3",
-    "xlsx": "^0.18.5"
+    "iconv-lite": "^0.6.3"
   }
 }
