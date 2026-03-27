@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lamelif RPT Kontrol</title>
+  <style>
+    :root {
+      --bg: #f6f7fb;
+      --card: #ffffff;
+      --text: #1e2330;
+      --muted: #677083;
+      --border: #e4e7ee;
+      --accent: #111827;
+      --good-bg: #ecfdf3;
+      --good-text: #027a48;
+      --warn-bg: #fff4ed;
+      --warn-text: #c4320a;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+    .wrap {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .card {
+      width: 100%;
+      max-width: 540px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 24px;
+      box-shadow: 0 10px 30px rgba(16, 24, 40, 0.08);
+    }
+    h1 {
+      margin: 0 0 8px;
+      font-size: 28px;
+    }
+    p {
+      margin: 0 0 20px;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+    .form {
+      display: flex;
+      gap: 10px;
+      flex-direction: column;
+    }
+    input {
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 14px 16px;
+      font-size: 16px;
+      outline: none;
+    }
+    input:focus {
+      border-color: #9ca3af;
+    }
+    button {
+      border: none;
+      background: var(--accent);
+      color: white;
+      border-radius: 14px;
+      padding: 14px 16px;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .result {
+      margin-top: 18px;
+      border-radius: 16px;
+      padding: 16px;
+      display: none;
+    }
+    .result.show { display: block; }
+    .result.rpt {
+      background: var(--good-bg);
+      color: var(--good-text);
+    }
+    .result.new {
+      background: var(--warn-bg);
+      color: var(--warn-text);
+    }
+    .meta {
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid rgba(0,0,0,0.08);
+      color: var(--text);
+    }
+    .meta div {
+      margin-top: 6px;
+      font-size: 14px;
+    }
+    .footer {
+      margin-top: 14px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h1>Lamelif RPT Kontrol</h1>
+      <p>Ürün kodunu gir. Kod katalogda varsa <strong>RPT</strong>, yoksa <strong>Yeni ürün</strong> sonucu gösterilsin.</p>
+
+      <div class="form">
+        <input id="codeInput" type="text" placeholder="Örn: A1927" autocomplete="off" />
+        <button id="checkButton">Sorgula</button>
+      </div>
+
+      <div id="resultBox" class="result">
+        <div id="resultText"></div>
+        <div id="resultMeta" class="meta"></div>
+      </div>
+
+      <div class="footer">Telefon ekranı için uyumlu tasarım.</div>
+    </div>
+  </div>
+
+  <script>
+    const input = document.getElementById('codeInput');
+    const button = document.getElementById('checkButton');
+    const resultBox = document.getElementById('resultBox');
+    const resultText = document.getElementById('resultText');
+    const resultMeta = document.getElementById('resultMeta');
+
+    async function checkCode() {
+      const code = input.value.trim();
+      resultBox.className = 'result show';
+      resultText.textContent = 'Kontrol ediliyor...';
+      resultMeta.innerHTML = '';
+
+      if (!code) {
+        resultBox.className = 'result show new';
+        resultText.textContent = 'Lütfen bir ürün kodu gir.';
+        return;
+      }
+
+      try {
+        const response = await fetch(`/api/check?code=${encodeURIComponent(code)}`);
+        const data = await response.json();
+
+        if (!response.ok) {
+          resultBox.className = 'result show new';
+          resultText.textContent = data.message || 'Bir hata oluştu.';
+          return;
+        }
+
+        if (data.status === 'RPT') {
+          resultBox.className = 'result show rpt';
+          resultText.textContent = data.message;
+          resultMeta.innerHTML = `
+            <div><strong>Ürün kodu:</strong> ${data.data.productCode}</div>
+            <div><strong>Ürün adı:</strong> ${data.data.productName || '-'}</div>
+            <div><strong>Kategori:</strong> ${data.data.category || '-'}</div>
+            <div><strong>Variant sayısı:</strong> ${data.data.totalVariants}</div>
+            <div><strong>Toplam stok:</strong> ${data.data.totalStock}</div>
+          `;
+        } else {
+          resultBox.className = 'result show new';
+          resultText.textContent = data.message;
+          resultMeta.innerHTML = `<div><strong>Aranan kod:</strong> ${code.toUpperCase()}</div>`;
+        }
+      } catch (error) {
+        resultBox.className = 'result show new';
+        resultText.textContent = 'Sunucuya bağlanırken hata oluştu.';
+        resultMeta.innerHTML = '';
+      }
+    }
+
+    button.addEventListener('click', checkCode);
+    input.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') checkCode();
+    });
+  </script>
+</body>
+</html>
